@@ -4,6 +4,7 @@
 
 | 贡献者 | 贡献内容 | 贡献时间 | 版本 |
 |--------|---------|---------|------|
+| Edison | 发布就绪：`LICENSE` 改为 `LICENSE.md` 以通过 SkillHub 文件类型校验；`.gitignore` 规则迁至本地 `.git/info/exclude`，仓库目录可直接 `skillhub publish` | 2026-10-27 | 1.0.12 |
 | Edison | 从 `nanjing-android-plugin` 独立提取为 `lanhu-android` 单 Skill 仓库，补齐 SkillHub manifest（slug/displayName/version/summary/license），移除插件命名前缀依赖 | 2026-10-27 | 1.0.11 |
 | Edison | 截图结构分析、视觉对比、切图语义确认改为派发子 agent 读图，skill 不再主动调用 `nanjing-vision` 视觉脚本：SKILL.md 去掉 vision 脚本 allowed-tools、改写阶段职责与执行流程；`commands/extract.md`、`commands/restore-check.md`、`rules/core-rules.md`（§1/§10）、`rules/extract-rules.md` §13、`schemas/layout-analysis-schema.md`（`viewer` 枚举改 `subagent`）、`lanhu_parser.py` 占位文案同步。识图 hook 保留自动触发，供不能读图的模型兜底 | 2026-10-19 | 1.0.10 |
 | Edison | `--json-color-summary` 修复（检测 r/g/b 数值三元组 + alpha 简写 + 放宽探索限制 + encoding_detected 输出字段）；补 allowed-tools(cp/svn/sh gradlew)；change_impact_report 加决策摘要 + 聊天同源输出；新增报告读者矩阵；create_page_report 去重只引 xml_report；restore-check 只列不一致项；差异清单大改分组排版；xml_report 合并为资源落地表；core-rules 加报告防覆盖规则 | 2026-09-17 | 1.0.8 |
@@ -36,7 +37,7 @@ lanhu-android/
 ├── .claude-plugin/plugin.json
 ├── README.md
 ├── SKILL.md
-├── LICENSE
+├── LICENSE.md
 ├── commands/
 ├── rules/
 ├── schemas/

@@ -2,7 +2,7 @@
 name: lanhu-android
 slug: lanhu-android
 displayName: Lanhu Android 蓝湖设计稿
-version: 1.0.11
+version: 1.0.12
 summary: 蓝湖设计稿转 Android：JSON+截图生成页面、受控改造已有页面、还原度检查，含标注/切图解析与布局校验脚本。
 license: MIT
 description: Android 蓝湖 Skill：蓝湖 JSON+截图→Android 页面生成、修改已有页面、还原度检查。
