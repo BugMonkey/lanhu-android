@@ -6,7 +6,7 @@
 
 ## 快速开始
 
-1. **安装油猴脚本**：浏览器安装 Tampermonkey，再把 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 装进去，装完刷新浏览器。
+1. **安装油猴脚本**：浏览器安装 Tampermonkey，再把 [lanhu-helper.user.js](lanhu-helper.user.js) 装进去，装完刷新浏览器。
 2. **在蓝湖生成提示词**：打开设计稿，选中画板，右下角会出现「lanhu-skill提示词助手」。选任务，填页面名或检查目标，复制提示词。
 3. **交给 Agent 执行**：粘贴到 Claude Code 或其他 Agent。Skill 会先 extract，再按任务生成、改造或检查。
 
@@ -18,26 +18,61 @@
 
 ## 安装
 
-`skillhub install` 会下载到 `@user_140863df/lanhu-android` 命名空间目录；ZCode / Claude Code 只扫描 `skills/<name>/SKILL.md` 平铺结构，所以要复制到平铺目录：
+Claude Code 的个人 Skill 目录是 `~/.claude/skills/<name>/SKILL.md`；项目级用 `<android-project>/.claude/skills/<name>/`。下面以个人目录为例，其他 Agent 宿主把路径换成自己的 skills 目录。
+
+### 方式一：GitHub clone（推荐）
+
+```bash
+mkdir -p ~/.claude/skills
+git clone git@github.com:BugMonkey/lanhu-android.git ~/.claude/skills/lanhu-android
+```
+
+仓库公开后也可以走 HTTPS：
+
+```bash
+git clone https://github.com/BugMonkey/lanhu-android.git ~/.claude/skills/lanhu-android
+```
+
+### 方式二：从本地目录复制
+
+macOS / Linux：
+
+```bash
+mkdir -p ~/.claude/skills/lanhu-android
+rsync -a --exclude .git --exclude __pycache__ \
+  /path/to/lanhu-android/ ~/.claude/skills/lanhu-android/
+```
+
+Windows PowerShell：
+
+```powershell
+robocopy "C:\path\to\lanhu-android" "$HOME\.claude\skills\lanhu-android" /E /XD .git __pycache__
+```
+
+### 方式三：GitHub ZIP
+
+GitHub 仓库页 → Code → Download ZIP，解压到 `~/.claude/skills/lanhu-android`，确认 `SKILL.md` 直接在目录下。
+
+### 方式四：SkillHub（可选）
 
 ```bash
 tmp=$(mktemp -d)
 skillhub install lanhu-android --namespace user_140863df --dir "$tmp"
-mkdir -p ~/.agents/skills/lanhu-android
-cp -R "$tmp/@user_140863df/lanhu-android/." ~/.agents/skills/lanhu-android/
+mkdir -p ~/.claude/skills/lanhu-android
+cp -R "$tmp/@user_140863df/lanhu-android/." ~/.claude/skills/lanhu-android/
 rm -rf "$tmp"
 ```
 
-Claude Code 把目标目录换成 `~/.claude/skills/lanhu-android`。
+`skillhub install` 会下载到 `@user_140863df/lanhu-android` 命名空间目录，所以要复制到平铺目录。`skillhub list` 不会显示 `--dir` 安装，以实际目录为准。
 
-验证：
+### 验证
 
 ```bash
-grep -m1 '^version:' ~/.agents/skills/lanhu-android/SKILL.md
-ls ~/.agents/skills/lanhu-android/蓝湖辅助脚本.user.js
+grep -m1 '^version:' ~/.claude/skills/lanhu-android/SKILL.md   # 1.0.14
+ls ~/.claude/skills/lanhu-android/lanhu-helper.user.js
 ```
 
-`skillhub list` 不会显示 `--dir` 安装的 Skill，以实际目录和 `SKILL.md` 为准。提示词脚本在 `蓝湖辅助脚本.user.js`。
+在 Claude Code 中执行 `/reload-skills` 或重启。提示词脚本在 `lanhu-helper.user.js`。
 
 ## 三种任务
 
@@ -74,7 +109,7 @@ ls ~/.agents/skills/lanhu-android/蓝湖辅助脚本.user.js
 
 几个实际注意点：
 
-- 提示词前缀由 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 第 13 行的 `COMMAND_PREFIX` 决定，当前是 `/lanhu-android`。
+- 提示词前缀由 [lanhu-helper.user.js](lanhu-helper.user.js) 第 13 行的 `COMMAND_PREFIX` 决定，当前是 `/lanhu-android`。
 - 脚本默认在提示词末尾追加「请先与我讨论需求，确认后再开始编码」。想直接开跑，删掉脚本第 124 行。
 - 脚本里的任务文案是「生成页面 / 修改已有页面 / 还原度检查」；Skill 也识别「生成新页面 / 修改现有页面」。
 - 面板里粘贴的截图只是占位符（`实现截图:粘贴的截图附件`）。复制提示词后，必须在同一条消息里再次附上截图，否则按未提供处理。
@@ -149,7 +184,7 @@ lanhu/
 | 现象 | 处理 |
 |------|------|
 | 粘贴提示词后没有触发 Skill | 确认前缀是 `/lanhu-android`，或直接写 `技能:lanhu-android` |
-| 提示词前缀不对 | 改 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 的 `COMMAND_PREFIX` |
+| 提示词前缀不对 | 改 [lanhu-helper.user.js](lanhu-helper.user.js) 的 `COMMAND_PREFIX` |
 | 执行被其他蓝湖 Skill 抢走 | 暂时禁用其他 Lanhu/蓝湖 Skill 和 MCP |
 | 切图缺失 | 检查 `slices.json` 和 `assets/`；未经确认禁止用 vector/shape 自绘替代，按 [rules/resource-rules.md](rules/resource-rules.md) §7.5 处理 |
 | 没有 `annotations.json` | 不要脑补尺寸、坐标、字号，先重新 extract |
@@ -176,7 +211,7 @@ lanhu-android/
 ├── LICENSE.md
 ├── README.md
 ├── SKILL.md                      # 路由、流程与约束
-├── 蓝湖辅助脚本.user.js          # 蓝湖网页提示词生成脚本
+├── lanhu-helper.user.js          # 蓝湖网页提示词生成脚本
 ├── commands/                     # extract / xml / create-page / restyle-page / restore-check
 ├── rules/                        # core / resource / layout / extract / global / restyle-guardrails
 ├── schemas/                      # layout_analysis 与 change_impact 结构
@@ -187,6 +222,7 @@ lanhu-android/
 
 | 版本 | 日期 | 内容 |
 |------|------|------|
+| 1.0.14 | 2026-10-28 | 油猴脚本文件名改为 ASCII，修复 ZIP 安装在 macOS 下的乱码；README 增加 GitHub clone / 本地复制 / ZIP / SkillHub 四种安装方式 |
 | 1.0.13 | 2026-10-28 | 独立仓库整理：重置版本记录，重写使用说明；保留蓝湖提取与三任务流程 |
 
 ## 维护

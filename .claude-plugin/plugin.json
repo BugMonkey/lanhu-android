@@ -1,7 +1,7 @@
 {
   "name": "lanhu-android",
   "description": "Android 蓝湖设计稿 Skill。配合油猴脚本使用，用于生成 Android 页面、在不改变原功能下修改已有页面，或对已生成页面做还原度检查。",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "author": {
     "name": "Edison"
   },
