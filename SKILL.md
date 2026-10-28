@@ -2,11 +2,11 @@
 name: lanhu-android
 slug: lanhu-android
 displayName: Lanhu Android 蓝湖设计稿
-version: 1.0.12
-summary: 蓝湖设计稿转 Android：JSON+截图生成页面、受控改造已有页面、还原度检查，含标注/切图解析与布局校验脚本。
+version: 1.0.13
+summary: 蓝湖设计稿转 Android：JSON+截图生成页面、受控修改已有页面、还原度检查，内置标注/切图解析与布局校验。
 license: MIT
-description: Android 蓝湖 Skill：蓝湖 JSON+截图→Android 页面生成、修改已有页面、还原度检查。
-argument-hint: '截图地址:<截图URL> sketchjson:<SKETCH_JSON_URL> 页面:<页面名> 任务:请明确选择一个任务:生成新页面、修改现有页面或还原度检查 检查目标:<检查目标> 实现截图:<截图路径或URL>'
+description: Android 蓝湖 Skill：基于蓝湖 JSON 与截图生成页面、受控修改已有页面并做还原度检查。
+argument-hint: '截图地址:<截图URL> sketchjson:<SKETCH_JSON_URL> 页面:<页面名> 任务:请明确选择一个任务:生成页面（或生成新页面）、修改已有页面（或修改现有页面）、还原度检查 检查目标:<检查目标> 实现截图:<截图路径或URL>'
 disable-model-invocation: true
 allowed-tools:
   - Read
@@ -33,6 +33,9 @@ allowed-tools:
   - Bash(cp *)
   - Bash(svn *)
   - Bash(git *)
+  - Bash(md5 *)
+  - Bash(md5sum *)
+  - Bash(rm -rf app/build/*)
   - Bash(sh gradlew *)
   - Bash(./gradlew *)
 ---
@@ -199,7 +202,7 @@ allowed-tools:
 - `scripts/`：`lanhu_parser.py`、`lanhu_inspect.py`、`lanhu_query.py`、`validate_layout_analysis.py`。
 - `.claude-plugin/plugin.json`：Skill manifest。
 
-## 执行流程
+## 分任务执行流程
 
 ### 生成页面
 

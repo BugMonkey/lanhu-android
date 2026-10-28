@@ -142,7 +142,7 @@ adb devices
 3. 准备好后，回复"截图"或"准备截图"
 
 我将在您回复后自动执行：
-adb exec-out screencap -p > lanhu/<extract_dir>/actual_screenshot.png
+adb exec-out screencap -p > "<extract_dir>/actual_screenshot.png"
 ```
 
 等待用户回复"截图"后执行：

@@ -219,4 +219,7 @@ python3 <skill_dir>/scripts/validate_layout_analysis.py "<extract_dir>"
 
 ## 报告
 
-`extract_report.md` 必含：输入、输出、scale、切图统计、issues 摘要、`status/warnings/blocked/next`。
+完成校验后，必须用 Write 工具写入 `<extract_dir>/extract_report.md`，不能只在对话里总结。必含：输入、输出、scale、切图统计、issues 摘要、`status/warnings/blocked/next`。
+
+- `status` 只能取 `success | warning | blocked`。
+- 校验结果为 `needs_enrichment` 时也要生成报告；合并视觉分析后同步更新。

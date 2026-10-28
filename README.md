@@ -1,128 +1,247 @@
-# 蓝湖设计稿处理工具
+# lanhu-android
 
-## 版本记录
+把蓝湖设计稿落成 Android 代码的 Skill。它先提取蓝湖 JSON、截图、切图和标注，再生成页面、改造已有页面或做还原度检查。
 
-| 贡献者 | 贡献内容 | 贡献时间 | 版本 |
-|--------|---------|---------|------|
-| Edison | 发布就绪：`LICENSE` 改为 `LICENSE.md` 以通过 SkillHub 文件类型校验；`.gitignore` 规则迁至本地 `.git/info/exclude`，仓库目录可直接 `skillhub publish` | 2026-10-27 | 1.0.12 |
-| Edison | 从 `nanjing-android-plugin` 独立提取为 `lanhu-android` 单 Skill 仓库，补齐 SkillHub manifest（slug/displayName/version/summary/license），移除插件命名前缀依赖 | 2026-10-27 | 1.0.11 |
-| Edison | 截图结构分析、视觉对比、切图语义确认改为派发子 agent 读图，skill 不再主动调用 `nanjing-vision` 视觉脚本：SKILL.md 去掉 vision 脚本 allowed-tools、改写阶段职责与执行流程；`commands/extract.md`、`commands/restore-check.md`、`rules/core-rules.md`（§1/§10）、`rules/extract-rules.md` §13、`schemas/layout-analysis-schema.md`（`viewer` 枚举改 `subagent`）、`lanhu_parser.py` 占位文案同步。识图 hook 保留自动触发，供不能读图的模型兜底 | 2026-10-19 | 1.0.10 |
-| Edison | `--json-color-summary` 修复（检测 r/g/b 数值三元组 + alpha 简写 + 放宽探索限制 + encoding_detected 输出字段）；补 allowed-tools(cp/svn/sh gradlew)；change_impact_report 加决策摘要 + 聊天同源输出；新增报告读者矩阵；create_page_report 去重只引 xml_report；restore-check 只列不一致项；差异清单大改分组排版；xml_report 合并为资源落地表；core-rules 加报告防覆盖规则 | 2026-09-17 | 1.0.8 |
-| Edison | 按用户实测反馈修复 8 类问题。**视觉脚本定位去内联 glob**（zsh `nomatch` 会让整条命令首跑即失败），统一走 `../nanjing-vision/scripts/vision_path.py`，allowed-tools 补 `git`。**新增 `lanhu_inspect.py --compare-assets`**：按内容 md5 比对切图与项目资源，逐条回显并报「同名图层组混淆风险」；`slices.json` 补 `node_id`/`node_x`/`node_y`/`ancestor_path`；resource-rules 新增 §7.6 资源同一性比对、§7.7 切图↔节点映射只认 `node_id`/`slice.drawable`；`resource_impact` 增 `reuse_asset`。**SKILL.md 读取规则重写为四段**（按任务类型 / 按是否触碰资源布局 / 资源自检表 / 视觉脚本），restyle 明确必须读 resource-rules + layout-rules。**core-rules 新增 §9 编译验证**（命令取宿主 CLAUDE.md/AGENTS.md、flavor 变体定位、报错文件归属判定、kapt/DataBinding 缓存损坏处置、打桩须 md5 逐字节还原）**与 §10 视觉脚本能力边界**（定性通道非数值通道，小图标取色不可作精确值；新增 `--format asset` 图形语义确认通道）。**change-impact-schema 新增 `baseline`/`concurrency_warnings`/`host_scope_findings`**：restyle-page 增 Phase 3.0 工作树基线与并发检查、Phase 6.0 改前重读与 md5 复核（防并行会话改动失效）。`lanhu_query.py` 新增 `--depth N` 递归展开子节点；意图确认提问容量放宽为每轮 4 个并给出必问清单；layout-analysis-schema 明确字段归属（视觉结论字段 vs 主流程字段） | 2026-09-22 | 1.0.9 |
-| Edison | 校验脚本改为三值状态（ready/needs_enrichment/blocked）并给出 next_action，识别 extract 骨架不再误报为阻塞；放宽不驱动下游动作的枚举与数组形式约束；明确双报告分工 | 2026-09-16 | 1.0.7 |
-| Edison | 截图视觉分析由自定义 subagent 改为 nanjing-vision 视觉脚本（vision_infer.py --format lanhu-layout/compare），模型 ID 由脚本参数指定 | 2026-08-13 | 1.0.6 |
-| Edison | 新增 layout_analysis 校验脚本与降级门禁，强化截图分析职责边界；补齐旧页面改造的差异分类、资源影响和背景切图保护规则 | 2026-06-12 | 1.0.5 |
-| Edison | 增加截图验收checklist，强化 agent 对看图遵循性；识图agent模型使用qwen3.7plus | 2026-06-10 | 1.0.4 |
-| Edison | extract 固化保存 raw.json，并新增原始 JSON 颜色安全查询入口，禁止猜临时路径 | 2026-05-27 | 1.0.3 |
-| Edison | lanhu-skill 提示词助手收敛为生成页面、修改已有页面、还原度检查三个功能 | 2026-05-22 | 1.0.2 |
-| Edison | 优化 Claude Code Skill 路由提示词，避免被其他蓝湖 Skill 抢占 | 2026-05-22 | 1.0.1 |
-| Edison | 从蓝湖设计稿还原ui | 2026-05-22 | 1.0.0 |
+当前重点优化 Sketch 来源的设计稿；Figma 来源暂未做专项优化。
 
-## 作者
+## 1. 它怎么工作
 
-Edison
+核心就一句：**先提取，再处理**。
 
-## 用途
+```text
+蓝湖选中画板
+  → 油猴面板填写页面名/任务/检查目标
+  → 复制标准提示词
+  → 粘贴到 Claude Code 或其他 Agent 宿主
+      → extract：解析 sketchjson，下载截图和切图，生成标注
+      → 生成页面 / 修改已有页面 / 还原度检查
+```
 
-蓝湖设计稿到 Android 一站式处理工具，支持：
-- 从蓝湖 JSON 提取标注、切图资源和布局分析结果
-- 生成 Android 页面
-- 修改已有页面布局
-- 检查设计稿和实现截图的还原度
+这样 AI 的判断来自蓝湖标注和真实切图，而不是只靠自然语言描述或截图猜测。
 
-## 目录结构
+## 2. 使用前准备
+
+1. **安装油猴（Tampermonkey）**：浏览器扩展商店搜索「篡改猴」，或访问 [tampermonkey.net](https://www.tampermonkey.net/index.php?browser=chrome)。
+2. **安装提示词脚本**：把仓库里的 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 安装到油猴，装完刷新或重启浏览器。
+3. **在项目根目录启动 Agent**：Agent 需要在目标 Android 项目根目录运行，extract 产物才会落到项目的 `lanhu/` 下。
+4. **本机依赖**：需要 `python3`；还原度检查建议安装 `adb`，否则只能用静态核对。
+5. **避免冲突**：执行时暂时禁用其他 Lanhu/蓝湖相关的 Skill 或 MCP，只保留本 Skill。
+6. **显式触发**：本 Skill 配置了 `disable-model-invocation`，不会自动路由。必须通过油猴生成提示词，或手动输入 `/lanhu-android ...`。
+
+## 3. 5 分钟上手
+
+### 3.1 在蓝湖打开提示词面板
+
+打开蓝湖设计稿页面，右下角会出现「lanhu-skill提示词助手」面板（页面加载即注入）。选中画板后，脚本会自动填入截图地址和 sketchjson；如果为空，刷新页面再试。
+
+### 3.2 选择任务并填写字段
+
+面板有三个入口：
+
+| 任务 | 需要填写 |
+|------|---------|
+| 生成页面 | 页面名、自定义需求（可选） |
+| 修改已有页面 | 现有页面名或页面文件、自定义需求（可选） |
+| 还原度检查 | 页面名、检查目标；实现截图路径或附件（可选，缺省走 ADB） |
+
+### 3.3 复制提示词并执行
+
+点击复制，把提示词原样粘贴到 Claude Code 或其他支持 Skill 的 Agent 宿主。生成的提示词形如：
+
+```text
+/lanhu-android 截图地址:<截图URL> sketchjson:<SKETCH_JSON_URL> 页面:<页面名> 任务:<任务类型>
+```
+
+还原度检查会额外带上 `检查目标:<检查目标>`，以及可选的 `实现截图:<路径或URL>`。
+
+几个实际注意点：
+
+- 提示词前缀由 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 第 13 行的 `COMMAND_PREFIX` 决定，当前是 `/lanhu-android`。如果你改了 Skill 名称，这里也要同步改。
+- 脚本默认会在提示词末尾追加「请先与我讨论需求，确认后再开始编码」。想直接开跑，删掉脚本第 124 行即可。
+- 脚本里的任务文案是「生成页面 / 修改已有页面 / 还原度检查」；Skill 也识别「生成新页面 / 修改现有页面」这两种说法。
+- 面板里粘贴的截图只是占位符（`实现截图:粘贴的截图附件`）。复制提示词后，必须在 Claude Code 同一条消息里再次附上该截图，否则按未提供处理，走 ADB 或静态核对。
+
+### 3.4 先检查 extract 产物
+
+首次使用建议先拿一个结构简单的页面验证。执行后项目根目录会出现：
+
+```text
+lanhu/
+└── SketchJSONURL.../
+    ├── annotations.json      # 组件树与标注（dp/sp）
+    ├── slices.json           # 切图清单与尺寸
+    ├── raw.json              # 原始设计 JSON
+    ├── source_meta.json      # 来源与落盘信息
+    ├── screenshot.png        # 设计稿截图
+    ├── layout_analysis.json  # 截图结构分析，核心中间产物
+    ├── issues.json           # extract 阻塞记录
+    ├── extract_report.md     # extract 自检报告
+    ├── assets/               # 下载的切图
+    │   ├── backgrounds/
+    │   ├── buttons/
+    │   ├── icons/
+    │   └── images/
+    ├── xml_report.md         # 生成/改造布局时
+    ├── create_page_report.md # 生成页面时
+    ├── restyle_report.md     # 修改已有页面时
+    ├── restore_check_report.md # 还原度检查时
+    └── actual_screenshot.png # 还原度检查可选
+```
+
+报告按任务生成，不是每次全部出现。
+
+如果 extract 阶段的文件没有出现，不要继续生成布局。`extract_report.md` 缺失视为 extract 未完成，先按 `issues.json` 修复后重跑。
+
+## 4. 三种任务怎么用
+
+### 4.1 生成页面
+
+**适用**：从 0 创建 Fragment、Activity、Dialog、列表 item 或普通布局页面。
+
+**必填**：截图地址、`sketchjson`、页面名、任务=生成页面。
+
+**可选**：`页面文件` 指向已有页面时，以它为入口做结构比对。
+
+**执行后**：生成布局 XML、shape/切图资源，以及当前页面能安全推断的 Fragment/Activity/Adapter 骨架。
+
+**边界**：不生成网络、仓储、复杂状态或假数据逻辑；骨架只补安全可推断的部分。
+
+### 4.2 修改已有页面
+
+**适用**：已有页面按新设计稿改版。
+
+**必填**：截图地址、`sketchjson`、现有页面名或页面文件、任务=修改已有页面。
+
+**执行后**：先做结构比对、引用扫描和影响分析，再受控改造；输出 `restyle_report.md`，包含执行前计划和执行后证据。
+
+**边界**：必须保留原有 ID、绑定、点击、埋点和业务逻辑；高风险改动先出计划等确认。
+
+### 4.3 还原度检查
+
+**适用**：页面完成后的自检，检查圆角、字体、颜色、间距、切图、点击区域是否与设计稿一致。
+
+**必填**：截图地址、`sketchjson`、页面名、任务=还原度检查、检查目标。
+
+**执行后**：输出 `restore_check_report.md`，只给差异和修复建议，不直接改文件。
+
+**实现截图**：可以手动提供路径或附件；不提供时，Skill 会检测设备并引导 ADB 截图。拿不到截图时降级为静态标注核对，结果标 `warning`。注意：面板粘贴附件只生成占位符，执行时必须在同一条消息里再次附上截图。
+
+## 5. 提示词字段从哪来
+
+| 字段 | 来源 | 说明 |
+|------|------|------|
+| `截图地址` | 油猴自动读取 | 当前画板的蓝湖截图 URL |
+| `sketchjson` | 油猴自动读取 | 当前画板的 Sketch/Figma JSON URL |
+| `页面` | 面板填写 | 如 `HomeFragment`、`item_coupon` |
+| `任务` | 面板选择 | 生成页面 / 修改已有页面 / 还原度检查 |
+| `检查目标` | 面板填写 | 整页、卡片、标题栏、列表 item 等 |
+| `实现截图` | 面板填写或附件 | 面板附件只生成占位，需在同条消息再次附图；缺省时走 ADB 引导 |
+| `页面文件` | 面板填写（可选） | 已有页面绝对路径，作为改造入口 |
+| `需求` | 面板填写（可选） | 范围取舍和特殊要求 |
+
+## 6. 产物怎么看
+
+| 产物 | 用途 |
+|------|------|
+| `annotations.json` | 核对尺寸、坐标、字号、颜色 |
+| `slices.json` | 核对切图是否齐全、命名是否语义化 |
+| `layout_analysis.json` | 看页面分区、层级、背景和待确认项 |
+| `xml_report.md` | 看布局和资源落地决策（生成/改造时） |
+| `create_page_report.md` | 看生成页面的骨架和安全推断（生成页面时） |
+| `restyle_report.md` | 看改造计划、差异分类和执行证据（修改页面时） |
+| `restore_check_report.md` | 看还原度差异和修复建议（检查时） |
+| `extract_report.md` | 看 extract 自检结果 |
+| `static_check.md` | 还原度检查无法获取实现截图时的静态核对结果 |
+| `actual_screenshot.png` | 还原度检查获取到的实现截图 |
+| `issues.json` | 看 extract 阶段的阻塞项 |
+
+报告按任务生成，不是每次全部出现。`extract_report.md` 缺失视为 extract 未完成，先按 [commands/extract.md](commands/extract.md) 和 `issues.json` 修复后重跑。
+
+`validate_layout_analysis.py` 返回的 `status` 只有三种含义：
+
+- `ready`：产物已具备实现条件，可以继续。
+- `needs_enrichment`：还是 extract 骨架，需要读图子 agent 补全视觉字段。
+- `blocked`：按 `errors` 修完再继续，禁止跳过。
+
+各报告自身的 `status` 另有一套取值：`success | warning | blocked`，不要和校验状态混用。
+
+## 7. 为什么不用 Lanhu MCP
+
+| 维度 | Lanhu MCP | 本 Skill |
+|------|-----------|----------|
+| 输入 | 需要开发人员描述大量页面细节 | 固定为截图 URL、`json`、页面名、任务，油猴生成 |
+| 样式还原 | 复杂页面圆角、字体、颜色、间距容易跑偏 | 优先读蓝湖 JSON 标注 |
+| 切图 | 下载失败时容易降级成 vector/shape 自绘 | 先下载 `slices.json` 和 `assets/`，有 slice 就用切图 |
+| 复杂层级 | 反复解析同一批标注，耗时长、占上下文 | 先落盘结构化产物，后续用脚本查询 |
+| 旧页面改造 | 容易只关注视觉，忽略绑定和业务 | 有独立的改造防护规则 |
+| 验收复查 | 问题定位依赖人工回忆 | 每阶段输出报告 |
+
+## 8. 使用建议
+
+- 先从低风险、结构简单的页面开始，例如「我的」页面、小弹窗、简单列表 item。
+- 首版生成后，两三轮内就进入手动修改，不要一直让 AI 反复重跑。
+- 可以多开几个 Agent 窗口，并行试不同页面或局部模块，挑质量好的结果。
+- 建议使用带视觉能力的模型，截图结构分析和还原度对比都依赖读图；并先从简单页面验证。
+- 复杂页面拆成局部模块验证，不要一开始就整页交给 AI。
+- AI 生成界面不是每次都稳定。把它当「帮忙」的工具：先完成布局、资源整理和基础样式，再结合标注和运行截图细调。
+
+## 9. 常见问题
+
+| 现象 | 处理 |
+|------|------|
+| 粘贴提示词后没有触发 Skill | 确认前缀是 `/lanhu-android`，或直接在提示词里写 `技能:lanhu-android` |
+| 提示词前缀不对 | 改 [蓝湖辅助脚本.user.js](蓝湖辅助脚本.user.js) 的 `COMMAND_PREFIX` |
+| 执行被其他蓝湖 Skill 抢走 | 暂时禁用其他 Lanhu/蓝湖 Skill 和 MCP |
+| 切图缺失 | 检查 `slices.json` 和 `assets/`；未经用户确认禁止用 vector/shape 自绘替代，按 [rules/resource-rules.md](rules/resource-rules.md) §7.5 三选一处置 |
+| 没有 `annotations.json` | 不要脑补尺寸、坐标、字号，先重新 extract |
+| validate 返回 `needs_enrichment` | 正常，继续让读图子 agent 补全视觉字段 |
+| validate 返回 `blocked` | 按 `errors` 逐项修复后重跑，不要跳过 |
+| ADB 连不上或截图失败 | 手动提供实现截图；无法提供时降级静态核对并标 `warning` |
+| 生成结果跑偏 | 缩小到局部模块，或两三轮后转手动修改 |
+
+## 10. 安装
+
+```bash
+skillhub install lanhu-android --namespace user_140863df
+# 或指定宿主 skills 目录
+skillhub install lanhu-android --namespace user_140863df --dir <宿主 skills 目录>
+```
+
+`skillhub install` 默认装到当前目录的 `./skills`。建议用 `--dir` 指向宿主的 skills 目录，否则 Agent 可能发现不到。提示词脚本在 `蓝湖辅助脚本.user.js`。
+
+## 11. 目录结构
 
 ```text
 lanhu-android/
-├── .claude-plugin/plugin.json
-├── README.md
-├── SKILL.md
+├── .claude-plugin/plugin.json    # Skill manifest
 ├── LICENSE.md
-├── commands/
-├── rules/
-├── schemas/
-├── scripts/
-└── 蓝湖辅助脚本.user.js
+├── README.md
+├── SKILL.md                      # 路由、流程与约束
+├── 蓝湖辅助脚本.user.js          # 蓝湖网页提示词生成脚本
+├── commands/                     # extract / xml / create-page / restyle-page / restore-check
+├── rules/                        # core / resource / layout / extract / global / restyle-guardrails
+├── schemas/                      # layout_analysis 与 change_impact 结构
+└── scripts/                      # parser / inspect / query / validate_layout_analysis
 ```
 
-说明：
-- `commands/`：子命令说明，包含 `extract`、`xml`、`create-page`、`restyle-page`、`restore-check`
-- `rules/`：全局约束和旧页面改造防护规则
-- `schemas/`：结构化报告与分析结果的字段约束
-- 截图结构分析与视觉对比：由主流程派发子 agent 读图完成，不依赖外部视觉脚本
-- `scripts/`：蓝湖提取、摘要、节点查询和 layout_analysis 校验脚本
+## 12. 版本记录
 
-## 入参
-
-| 参数 | 类型 | 说明 |
+| 版本 | 日期 | 内容 |
 |------|------|------|
-| json_url | string | 蓝湖 JSON URL（extract 必填） |
-| screenshot | string | 设计稿截图 URL 或本地路径 |
-| android-project | string | Android 项目根目录路径 |
-| output | string | 输出目录（默认 ./lanhu） |
-| page | string | 页面名称 |
-| target | string | 还原度检查目标 |
-| actual-screenshot | string | 实现截图路径（还原度检查推荐） |
-| no-download | flag | 跳过切图下载 |
-| force-refresh | flag | 忽略同一设计稿的本地提取缓存，强制重新下载 |
+| 1.0.13 | 2026-10-27 | README 按使用流程重写；补齐前置条件、附件截图、状态语义和安装位置；统一任务词汇与报告路径 |
+| 1.0.12 | 2026-10-27 | 发布就绪：`LICENSE` 改为 `LICENSE.md`，`.gitignore` 迁至 `.git/info/exclude`，仓库可直接发布 |
+| 1.0.11 | 2026-10-27 | 从 `nanjing-android-plugin` 独立提取为 `lanhu-android` 单 Skill 仓库 |
+| 1.0.10 | 2026-10-19 | 截图结构分析、视觉对比和切图语义确认改为派发子 agent 读图 |
+| 1.0.0–1.0.9 | 2026-05-22–2026-09-22 | 建立三任务路由；extract 固化 `raw.json`；三值校验状态；切图 md5 比对；编译验证；旧页面改造防护 |
 
-## 出参
+`.git/info/exclude` 只在本机生效。发布前确认 `lanhu/`、`__pycache__/` 等产物没有被一起打包。
 
-| 产物 | 说明 |
-|------|------|
-| annotations.json | 组件树结构 |
-| slices.json | 切图清单 |
-| raw.json | extract 固化保存的原始设计 JSON |
-| source_meta.json | 原始 JSON 来源和落盘信息 |
-| layout_analysis.json | 截图结构分析结果（核心产物） |
-| assets/ | 切图资源目录 |
-| res/layout/*.xml | Android 布局文件 |
-| res/drawable/*.xml | Shape/drawable 文件 |
-| res/drawable-xxhdpi/*.png | 切图资源文件 |
-| xml_report.md | 布局决策报告 |
-| restore_check_report.md | 还原度检查报告 |
-| restyle_report.md | 改造报告（执行前计划与约束 + 执行结果与证据） |
+## 13. 参考
 
-## 使用示例
+- 完整流程与约束：[SKILL.md](SKILL.md)
+- 任务说明：[commands/](commands/)
+- 核心规则：[rules/core-rules.md](rules/core-rules.md)
+- 结构约束：[schemas/layout-analysis-schema.md](schemas/layout-analysis-schema.md)、[schemas/change-impact-schema.md](schemas/change-impact-schema.md)
+- 许可：[LICENSE.md](LICENSE.md)
 
-### 缓存复用
-
-第二次使用同一 `sketchjson` 时默认会复用本地完整提取产物，不重复下载 JSON 和切图。只有缓存缺少关键产物，或显式增加 `--force-refresh` 时才会重新提取。`extract_dir` 的完整规则以 `core-rules.md` 和 `commands/extract.md` 为准。
-
-### 修改已有页面
-
-```text
-/lanhu-android 截图地址:https://alipic.lanhuapp.com/SketchCovere728aedc81af51e6fe17458224f61a49c51096f0513e6f86a67e940b58b71692 sketchjson:https://alipic.lanhuapp.com/SketchJSONURL1113f3832c598f8659c34a0077f8d81e9be4281b1f7363fd5ed8d093a96ce59a 页面:<现有页面名> 任务:修改已有页面
-```
-
-### 生成页面
-
-```text
-/lanhu-android 截图地址:https://alipic.lanhuapp.com/SketchCovere728aedc81af51e6fe17458224f61a49c51096f0513e6f86a67e940b58b71692 sketchjson:https://alipic.lanhuapp.com/SketchJSONURL1113f3832c598f8659c34a0077f8d81e9be4281b1f7363fd5ed8d093a96ce59a 页面:ReviewDeliveryHistoryFragment 任务:生成页面 需求:自定义需求
-```
-
-### 还原度检查
-
-```text
-/lanhu-android 截图地址:https://alipic.lanhuapp.com/SketchCovere728aedc81af51e6fe17458224f61a49c51096f0513e6f86a67e940b58b71692 sketchjson:https://alipic.lanhuapp.com/SketchJSONURL1113f3832c598f8659c34a0077f8d81e9be4281b1f7363fd5ed8d093a96ce59a 页面:ReviewDeliveryHistoryFragment 任务:还原度检查 检查目标:卡片的样式 需求:自定义需求
-```
-
-### 修改已有页面命令
-
-```text
-/lanhu-android restyle-page <extract_dir> --page <页面名>
-```
-
-## 路由说明
-
-- 仅在用户显式输入 `技能:lanhu-android`、`/lanhu-android`、`请使用 Skill lanhu-android` 时独占路由到本 Skill
-- 蓝湖辅助脚本生成的标准前缀推荐使用：`技能:lanhu-android /lanhu-android ...`
-- 本 Skill 从 `nanjing-android-plugin` 中独立提取，可单独安装使用，不依赖原插件
-
-## 子命令
-
-- `extract` — 解析蓝湖 JSON、下载截图和切图，生成结构化产物
-- `xml` — 根据提取产物生成 XML、shape 和切图资源
-- `create-page` — 在 `xml` 基础上补安全可推断的页面代码骨架
-- `restyle-page` — 根据新设计稿改造旧页面并输出影响分析
-- `restore-check` — 对比设计稿和实现产物，输出还原度检查报告
+作者：Edison
